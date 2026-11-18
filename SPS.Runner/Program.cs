@@ -7,15 +7,20 @@ using SPS.Student;
 using SPS.Telemetry;
 
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-static ISystemPolicy CreateStudentPolicy() => new SampleSystemPolicy();
+static ISystemPolicy CreateStudentPolicy(string name) => name.ToLowerInvariant() switch
+{
+    "sample" or "baseline" => new SampleSystemPolicy(),
+    _ => new TrushkoSystemPolicy()
+};
 int seed = 42, traceCount = 0, stepMs = 0;
 string? recording = null;
+string policyName = "student";
 bool interactive = args.Length == 0 && !Console.IsInputRedirected;
 try
 {
     if (args.Length == 1 && args[0] is "--help" or "-h")
     {
-        Console.WriteLine("Usage: SPS.Runner [--seed N] [--trace N] [--record path.jsonl] [--step-ms N]");
+        Console.WriteLine("Usage: SPS.Runner [--seed N] [--trace N] [--record path.jsonl] [--step-ms N] [--policy student|sample]");
         return 0;
     }
     for (int i = 0; i < args.Length; i++)
@@ -28,6 +33,7 @@ try
             case "--trace": traceCount = int.Parse(value); break;
             case "--record": recording = value; break;
             case "--step-ms": stepMs = int.Parse(value); if (stepMs <= 0) throw new ArgumentException("Step interval must be positive."); break;
+            case "--policy": policyName = value; break;
             default: throw new ArgumentException($"Unknown option {option}.");
         }
     }
@@ -44,10 +50,10 @@ try
     var scenario = PublicScenario.Create();
     var options = new SimulationOptions(seed, traceCount);
     SimulationResult result;
-    if (stepMs == 0) result = new SimulationRunner().Run(scenario, CreateStudentPolicy(), options, recorder);
+    if (stepMs == 0) result = new SimulationRunner().Run(scenario, CreateStudentPolicy(policyName), options, recorder);
     else
     {
-        var session = new SimulationSession(scenario, CreateStudentPolicy(), options, recorder);
+        var session = new SimulationSession(scenario, CreateStudentPolicy(policyName), options, recorder);
         while (!session.IsCompleted)
             session.AdvanceTo(session.Now + TimeSpan.FromMilliseconds(stepMs) < scenario.FinalTime
                 ? session.Now + TimeSpan.FromMilliseconds(stepMs) : scenario.FinalTime);
